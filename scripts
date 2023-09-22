@@ -1,0 +1,76 @@
+
+#!/bin/bash
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+rm get-docker.sh
+
+# Install Docker Compose
+sudo apt-get install -y docker-compose
+
+# Create a directory for the Docker Compose configuration
+mkdir -p docker-setup
+cd docker-setup
+
+# Create a Docker Compose file for the services
+cat <<EOF > docker-compose.yml
+version: '3'
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - "8080:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    environment:
+      - TZ=America/New_York  # Set your desired timezone here
+
+  nexus:
+    image: sonatype/nexus3
+    container_name: nexus
+    ports:
+      - "8081:8081"
+    volumes:
+      - nexus_data:/nexus-data
+
+  sonarqube:
+    image: sonarqube:latest
+    container_name: sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      - SONARQUBE_JDBC_USERNAME=sonar
+      - SONARQUBE_JDBC_PASSWORD=sonar
+      - SONARQUBE_JDBC_URL=jdbc:postgresql://sonarqube-db:5432/sonar
+    depends_on:
+      - sonarqube-db
+
+  sonarqube-db:
+    image: postgres:alpine
+    container_name: sonarqube-db
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+    volumes:
+      - sonarqube-db-data:/var/lib/postgresql/data
+
+volumes:
+  jenkins_home:
+  nexus_data:
+  sonarqube-db-data:
+EOF
+
+# Start the services using Docker Compose
+docker-compose up -d
+
+# Clean up
+cd ..
+rm -rf docker-setup
+
+echo "Services are now running:"
+echo "Jenkins: http://localhost:8080"
+echo "Nexus: http://localhost:8081"
+echo "SonarQube: http://localhost:9000"
